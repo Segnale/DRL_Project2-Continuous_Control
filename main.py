@@ -51,6 +51,7 @@ class Policy(nn.Module):
         """Build a network that maps state -> action values."""
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         return self.out(x)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -80,9 +81,6 @@ def collect_trajectories(env, policy, tmax=200, nrand=5):
         actions = np.clip(actions, -1, 1)                  # all actions between -1 and 1
         env_info = env.step(actions)[brain_name]           # send all actions to the environment
 
-        # @@@@ fr1, re1, _, _ = envs.step(np.random.randn(num_agents, action_size))
-        # @@@@ fr2, re2, _, _ = envs.step([0]*n)
-
     for t in range(tmax):
 
         # probs will only be used as the pi_old
@@ -90,9 +88,10 @@ def collect_trajectories(env, policy, tmax=200, nrand=5):
         # so we move it to the cpu
         states = env_info.vector_observations               # get next state (for each agent)
         rewards = env_info.rewards                          # get reward (for each agent)
-        actions = policy(states)                            # Take actions from the policy
+        
+        #states = torch.from_numpy(states)
+        actions = policy(torch.tensor(states, dtype=torch.float, device=device)).squeeze().cpu().detach().numpy()#.detach().numpy()                            # Take actions from the policy
         #@@@@probs = policy(states).squeeze().cpu().detach().numpy()
-
         #@@@@action = np.where(np.random.rand(n) < probs, RIGHT, LEFT)
         #@@@@probs = np.where(action==RIGHT, probs, 1.0-probs)
 
@@ -108,7 +107,7 @@ def collect_trajectories(env, policy, tmax=200, nrand=5):
         #@@@@reward = re1 + re2
 
         # store the result
-        state_list.append(states)
+        state_list.append(torch.from_numpy(states).float().to(device))#state_list.append(states)
         reward_list.append(rewards)
         #@@@@prob_list.append(probs)
         action_list.append(actions)
@@ -125,7 +124,7 @@ def collect_trajectories(env, policy, tmax=200, nrand=5):
 
 # clipped surrogate function
 # similar as -policy_loss for REINFORCE, but for PPO
-def clipped_surrogate(policy, old_probs, states, actions, rewards,
+def clipped_surrogate(policy, actions, states, rewards,
                       discount=0.995,
                       epsilon=0.1, beta=0.01):
 
@@ -142,24 +141,25 @@ def clipped_surrogate(policy, old_probs, states, actions, rewards,
 
     # convert everything into pytorch tensors and move to gpu if available
     actions = torch.tensor(actions, dtype=torch.float, device=device)
-    old_probs = torch.tensor(old_probs, dtype=torch.float, device=device)
+    #actions = torch.tensor(old_probs, dtype=torch.float, device=device)
     rewards = torch.tensor(rewards_normalized, dtype=torch.float, device=device)
-
+    states = torch.stack(states)
     # convert states to policy (or probability)
-    new_probs = policy(states)
+    new_probs = policy(states.view(np.prod(states.shape[:2]),*states.shape[2:])).view(320,20,4)
 
     # ratio for clipping
-    ratio = new_probs/old_probs
+    ratio = new_probs/actions
 
     # clipped function
     clip = torch.clamp(ratio, 1-epsilon, 1+epsilon)
+    rewards = rewards.unsqueeze(2).repeat(1,1,4)
     clipped_surrogate = torch.min(ratio*rewards, clip*rewards)
 
     # include a regularization term
     # this steers new_policy towards 0.5
     # add in 1.e-10 to avoid log(0) which gives nan
-    entropy = -(new_probs*torch.log(old_probs+1.e-10)+ \
-        (1.0-new_probs)*torch.log(1.0-old_probs+1.e-10))
+    entropy = -(new_probs*torch.log(actions+1.e-10)+ \
+        (1.0-new_probs)*torch.log(1.0-actions+1.e-10))
 
 
     # this returns an average of all the entries of the tensor
@@ -168,7 +168,10 @@ def clipped_surrogate(policy, old_probs, states, actions, rewards,
     # this is desirable because we have normalized our rewards
     return torch.mean(clipped_surrogate + beta*entropy)
 
-
+    ###################################################################
+    # Main
+    ###################################################################
+    
 discount_rate = .99
 epsilon = 0.1
 beta = .01
@@ -192,6 +195,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 policy = Policy(state_size, action_size, seed).to(device)
 
+# we use the adam optimizer with learning rate 2e-4
+# optim.SGD is also possible
+import torch.optim as optim
+optimizer = optim.Adam(policy.parameters(), lr=1e-4)
+
+
 for e in range(episode):
 
     # collect trajectories
@@ -204,7 +213,7 @@ for e in range(episode):
     # gradient ascent step
     for _ in range(SGD_epoch):
 
-        L = -clipped_surrogate(policy, old_probs, states, actions, rewards,
+        L = -clipped_surrogate(policy, actions, states, rewards,
                                           epsilon=epsilon, beta=beta)
         optimizer.zero_grad()
         L.backward()
