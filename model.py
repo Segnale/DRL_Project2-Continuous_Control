@@ -5,7 +5,7 @@ import torch.nn.functional as F
 class Policy(nn.Module):
     """Policy Model."""
 
-    def __init__(self, state_size, action_size, seed, fc1_units=64, fc2_units=64):
+    def __init__(self, state_size, action_size, seed, fc1_units=64, fc2_units=64, fcC_units = 64):
         """Initialize parameters and build model.
         Params
         ======
@@ -19,13 +19,23 @@ class Policy(nn.Module):
         self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(state_size, fc1_units)
         self.fc2 = nn.Linear(fc1_units, fc2_units)
-        self.fc3 = nn.Linear(fc2_units, action_size)
-        self.out = nn.Sigmoid()
+        self.fcA = nn.Linear(fc2_units, action_size)
+        self.fcC = nn.Linear(fc2_units,1)
+        self.Aout = nn.Tanh()
 
-    def forward(self, state):
+        self.std = nn.Parameter(torch.zeros(1, action_size))
+
+    def forward(self, state, action = None):
         """Build a network that maps state -> action values."""
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
+        a = F.relu(self.fcA(x))
+        v = self.fcC(x)
+        a = self.Aout(a)
 
-        return self.out(x)
+        dist = torch.distributions.Normal(a, F.softplus(self.std))
+        if action is None:
+            action = dist.sample()
+        log_prob = dist.log_prob(action)
+
+        return action, log_prob, dist.entropy(), v

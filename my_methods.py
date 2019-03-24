@@ -9,10 +9,10 @@ def collect_trajectories(env, policy, tmax=200, nrand=5):
         #initialize returning lists and start the game!
     state_list=[]
     reward_list=[]
-    #prob_list=[]
+    # prob_list=[]
     action_list=[]
 
-
+    
     brain_name = env.brain_names[0]
     brain = env.brains[brain_name]
     env_info = env.reset(train_mode=True)[brain_name]
@@ -39,8 +39,9 @@ def collect_trajectories(env, policy, tmax=200, nrand=5):
         states = env_info.vector_observations               # get next state (for each agent)
         rewards = env_info.rewards                          # get reward (for each agent)
 
-        #states = torch.from_numpy(states)
-        actions = policy(torch.tensor(states, dtype=torch.float, device=device)).squeeze().cpu().detach().numpy()#.detach().numpy()                            # Take actions from the policy
+        Pstates = torch.tensor(states, dtype=torch.float, device=device)
+        actions = policy(Pstates)
+        actions = actions.squeeze().cpu().detach().numpy()#.detach().numpy()                            # Take actions from the policy
         #@@@@probs = policy(states).squeeze().cpu().detach().numpy()
         #@@@@action = np.where(np.random.rand(n) < probs, RIGHT, LEFT)
         #@@@@probs = np.where(action==RIGHT, probs, 1.0-probs)
@@ -59,7 +60,7 @@ def collect_trajectories(env, policy, tmax=200, nrand=5):
         # store the result
         state_list.append(torch.from_numpy(states).float().to(device))#state_list.append(states)
         reward_list.append(rewards)
-        #@@@@prob_list.append(probs)
+        # prob_list.append(probs)
         action_list.append(actions)
 
         # stop if any of the trajectories is done
@@ -91,11 +92,12 @@ def clipped_surrogate(policy, actions, states, rewards,
 
     # convert everything into pytorch tensors and move to gpu if available
     actions = torch.tensor(actions, dtype=torch.float, device=device)
-    #actions = torch.tensor(old_probs, dtype=torch.float, device=device)
+    # old_probs = torch.tensor(old_probs, dtype=torch.float, device=device)
     rewards = torch.tensor(rewards_normalized, dtype=torch.float, device=device)
     states = torch.stack(states)
     # convert states to policy (or probability)
-    new_probs = policy(states.view(np.prod(states.shape[:2]),*states.shape[2:])).view(320,20,4)
+    new_probs = policy(states.view(np.prod(states.shape[:2]),*states.shape[2:]))
+    new_probs = new_probs.view(320,20,4)
 
     # ratio for clipping
     ratio = new_probs/actions
