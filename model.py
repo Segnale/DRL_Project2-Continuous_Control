@@ -5,7 +5,7 @@ import torch.nn.functional as F
 class Policy(nn.Module):
     """Policy Model."""
 
-    def __init__(self, state_size, action_size, seed, fc1_units=64, fc2_units=64, fcC_units = 64):
+    def __init__(self, state_size, action_size, seed, fc1_units=124, fc2_units=124, fcC_units = 64):
         """Initialize parameters and build model.
         Params
         ======
@@ -17,22 +17,29 @@ class Policy(nn.Module):
         """
         super(Policy, self).__init__()
         self.seed = torch.manual_seed(seed)
-        self.fc1 = nn.Linear(state_size, fc1_units)
-        self.fc2 = nn.Linear(fc1_units, fc2_units)
+        self.fcA1 = nn.Linear(state_size, fc1_units)
+        self.fcA2 = nn.Linear(fc1_units, fc2_units)
         self.fcA = nn.Linear(fc2_units, action_size)
+        # self.Aout = nn.Tanh()
+
+        self.fcC1 = nn.Linear(state_size, fc1_units)
+        self.fcC2 = nn.Linear(fc1_units, fc2_units)
         self.fcC = nn.Linear(fc2_units,1)
-        self.Aout = nn.Tanh()
 
         self.std = nn.Parameter(torch.zeros(1, action_size))
 
     def forward(self, state, action = None):
         """Build a network that maps state -> action values."""
-        x = F.relu(self.fc1(state))
-        x = F.relu(self.fc2(x))
-        a = F.relu(self.fcA(x))
-        v = self.fcC(x)
-        a = self.Aout(a)
+        a = F.relu(self.fcA1(state))
+        a = F.relu(self.fcA2(a))
+        a = F.relu(self.fcA(a))
+        # a = self.Aout(a)
 
+        v = F.relu(self.fcC1(state))
+        v = F.relu(self.fcC2(v))
+        v = self.fcC(v)
+        
+        a = torch.tanh(a)
         dist = torch.distributions.Normal(a, F.softplus(self.std))
         if action is None:
             action = dist.sample()

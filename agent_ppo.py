@@ -26,8 +26,8 @@ class Agent():
     """
     def __init__(self, env, policy,
                  nsteps=200, epochs=10, nbatchs=32,
-                 ratio_clip=0.2, lrate=1e-3, lrate_schedule=lambda it: 1.0, beta=0.01,
-                 gae_tau=0.95, gamma=0.99, weight_decay=0.0, gradient_clip=0.5, restore=None):
+                 ratio_clip=0.2, lrate=1e-4, lrate_schedule=lambda it: 1.0, beta=0.01,
+                 gae_tau=0.95, gamma=0.99, weight_decay=0.0, gradient_clip=10, restore=None):
         self.nsteps = nsteps
         self.env = env
         self.policy = policy

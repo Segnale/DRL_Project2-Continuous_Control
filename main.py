@@ -29,7 +29,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # print('There are {} agents. Each observes a state with length: {}'.format(states.shape[0], state_size))
 # print('The state for the first agent looks like:', states[0])
 
-env = UnityEnv(env_file='Reachers_Windows_x86_64/Reacher.exe', no_graphics=False)
+env = UnityEnv(env_file='Reachers_Windows_x86_64/Reacher.exe', no_graphics=True)
 
 discount_rate = .99
 epsilon = 0.1
@@ -39,6 +39,8 @@ SGD_epoch = 4
 seed = 0
 # training loop max iterations
 episode = 1500
+
+print("\nRunning with: ", device, "\n")
 
 # widget bar to display progress
 #!pip install progressbar
@@ -54,8 +56,8 @@ policy = model.Policy(env.state_size, env.action_size, seed).to(device)
 agent = Agent(env, policy)
 # we use the adam optimizer with learning rate 2e-4
 # optim.SGD is also possible
-import torch.optim as optim
-optimizer = optim.Adam(policy.parameters(), lr=2e-4)
+# import torch.optim as optim
+# optimizer = optim.Adam(policy.parameters(), lr=2e-4)
 
 for e in range(episode):
 
@@ -101,3 +103,14 @@ for e in range(episode):
     timer.update(e+1)
 
 timer.finish()
+
+import pandas as pd
+import matplotlib.pyplot as plt
+df = pd.DataFrame({'score': rewards})
+# plot the score moving avarages to reduce the noise\n",
+fig = plt.figure(figsize=[20,10])
+ax = fig.add_subplot(221)
+plt.title("Moving Avarage (" + str(Win) + ")")
+plt.plot(np.arange(len(rewards)), df)
+plt.ylabel('Score')
+plt.xlabel('Episode #')
