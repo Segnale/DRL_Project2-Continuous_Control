@@ -38,7 +38,7 @@ tmax = 320
 SGD_epoch = 4
 seed = 0
 # training loop max iterations
-episode = 1500
+episode = 2000
 
 print("\nRunning with: ", device, "\n")
 
@@ -106,11 +106,12 @@ timer.finish()
 
 import pandas as pd
 import matplotlib.pyplot as plt
-df = pd.DataFrame({'score': rewards})
+df = pd.DataFrame({'score': list(zip(*rewards))[3]})
 # plot the score moving avarages to reduce the noise\n",
-fig = plt.figure(figsize=[20,10])
-ax = fig.add_subplot(221)
-plt.title("Moving Avarage (" + str(Win) + ")")
+fig = plt.figure(figsize=[10,5])
+ax = fig.add_subplot(111)
+plt.title("Learning")
 plt.plot(np.arange(len(rewards)), df)
 plt.ylabel('Score')
 plt.xlabel('Episode #')
+plt.show()
