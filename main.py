@@ -38,7 +38,7 @@ tmax = 320
 SGD_epoch = 4
 seed = 0
 # training loop max iterations
-episode = 2000
+episode = 1500
 
 print("\nRunning with: ", device, "\n")
 
@@ -63,36 +63,10 @@ for e in range(episode):
 
     agent.step()
     
-    # collect trajectories
-    # states, actions, rewards = \
-    #    my_methods.collect_trajectories(env, policy, tmax=tmax)
 
-    #total_rewards = np.sum(rewards, axis=0)
-
-
-    # gradient ascent step
-    #for _ in range(SGD_epoch):
-
-    #    L = -my_methods.clipped_surrogate(policy, actions, states, rewards,
-    #                                      epsilon=epsilon, beta=beta)
-    #    optimizer.zero_grad()
-    #    L.backward()
-    #    optimizer.step()
-    #    del L
-
-    # the clipping parameter reduces as time goes on
-    #epsilon*=.999
-
-    # the regulation term also reduces
-    # this reduces exploration in later runs
-    #beta*=.995
-
-    # get the average reward of the parallel environments
-    #mean_rewards.append(np.mean(total_rewards))
-
-    if len(agent.episodes_reward) >= 50:
-        r = agent.episodes_reward[:-51:-1]
-        total_rewards = agent.episodes_reward[:-51:-1]
+    if len(agent.episodes_reward) >= 100:
+        r = agent.episodes_reward[:-101:-1]
+        total_rewards = agent.episodes_reward[:-101:-1]
         rewards.append((agent.steps, min(r), max(r), np.mean(r), np.std(r)))
 
     # display some progress every 20 iterations
