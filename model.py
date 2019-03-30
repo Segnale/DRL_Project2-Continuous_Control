@@ -5,14 +5,14 @@ import torch.nn.functional as F
 class Policy(nn.Module):
     """Policy Model."""
 
-    def __init__(self, state_size, action_size, seed, fc1_units=200, fc2_units=200, fcC_units = 124):
+    def __init__(self, state_size, action_size, seed = 0, fc1_units=200, fc2_units=200, fcC_units = 124):
         """Initialize parameters and build model.
         Params
         ======
             state_size (int): Dimension of each state
             action_size (int): Dimension of each action
             seed (int): Random seed
-            fc1_units (int): Number of nodes in first hidden layer
+            fc1_units (int): Number of nodes in fsirst hidden layer
             fc2_units (int): Number of nodes in second hidden layer
         """
         super(Policy, self).__init__()
