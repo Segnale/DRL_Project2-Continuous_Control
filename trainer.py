@@ -6,7 +6,7 @@ from model import Policy
 
 if __name__ == '__main__':
     #pylint: disable=invalid-name
-    iterations = 2000
+    iterations = 500
     gamma = 0.99
     timesteps = 100
     ratio_clip = 0.2
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     out_file = 'saved/ppo.ckpt'
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    env = UnityEnv(env_file='Reachers_Windows_x86_64/Reacher.exe', no_graphics=False)
+    env = UnityEnv(env_file='Reachers_Windows_x86_64/Reacher.exe', no_graphics=True)
     policy = Policy(env.state_size, env.action_size).to(device)
 
     print("\nRunning with: ", device, "\n")

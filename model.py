@@ -1,48 +1,36 @@
 import torch
-import torch.nn as nn
+import torch.nn as nn 
 import torch.nn.functional as F
 
 class Policy(nn.Module):
-    """Policy Model."""
 
-    def __init__(self, state_size, action_size, seed = 0, fc1_units=200, fc2_units=200, fcC_units = 124):
-        """Initialize parameters and build model.
-        Params
-        ======
-            state_size (int): Dimension of each state
-            action_size (int): Dimension of each action
-            seed (int): Random seed
-            fc1_units (int): Number of nodes in fsirst hidden layer
-            fc2_units (int): Number of nodes in second hidden layer
-        """
+    def __init__(self, state_size, action_dim):
         super(Policy, self).__init__()
-        self.seed = torch.manual_seed(seed)
-        self.fc = nn.Linear(state_size, fc1_units)
-        self.fc2 = nn.Linear(fc1_units, fc2_units)
-        self.fcA = nn.Linear(fc2_units, action_size)
-        # self.Aout = nn.Tanh()
+        self.state_size = state_size
+        self.action_dim = action_dim
 
-        # self.fcC1 = nn.Linear(state_size, fc1_units)
-        self.fcC2 = nn.Linear(fc1_units, fcC_units)
-        self.fcC = nn.Linear(fcC_units,1)
+        self.fc1 = nn.Linear(state_size, 100)
+        self.fc2 = nn.Linear(100, 100)
 
-        self.std = nn.Parameter(torch.zeros(1, action_size))
+        self.fc_actor = nn.Linear(100, self.action_dim)
+        self.fc_critic = nn.Linear(100, 1)
 
-    def forward(self, state, action = None):
-        """Build a network that maps state -> action values."""
-        x = F.relu(self.fc(state))
-        a = F.relu(self.fc2(x))
-        a = F.relu(self.fcA(a))
-        # a = self.Aout(a)
+        self.std = nn.Parameter(torch.zeros(1, action_dim))
 
-        # v = F.relu(self.fcC1(state))
-        v = F.relu(self.fcC2(x))
-        v = self.fcC(v)
-        
-        a = torch.tanh(a)
-        dist = torch.distributions.Normal(a, F.softplus(self.std))
+    def forward(self, x, action=None):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+
+        # Actor
+        mean = torch.tanh(self.fc_actor(x))
+        dist = torch.distributions.Normal(mean, F.softplus(self.std))
         if action is None:
             action = dist.sample()
         log_prob = dist.log_prob(action)
 
+        # Critic
+        # State value V(s)
+        v = self.fc_critic(x)
+
         return action, log_prob, dist.entropy(), v
+
