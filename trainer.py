@@ -1,7 +1,7 @@
 import torch
 from train_ppo import train
 from unity_env import UnityEnv
-from agent_ppo import Agent
+from agent_ppo_bkup import Agent
 from model import Policy
 
 if __name__ == '__main__':

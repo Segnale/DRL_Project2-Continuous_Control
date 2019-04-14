@@ -24,15 +24,13 @@ class Agent():
         gradient_clip       Gradient norm clipping
         restore
     """
-    def __init__(self, state_size, action_size, num_agents, policy,
+    def __init__(self, env, policy,
                  nsteps=2048, epochs=10, nbatchs=32,
                  ratio_clip=0.2, lrate=2e-4, lrate_schedule=lambda it: max(0.995 ** it, 0.01), beta=0.0,
                  gae_tau=0.95, gamma=0.99, weight_decay=0.0, gradient_clip=5, restore=None):
-        self.state_size = state_size
-        self.action_size = action_size
-        self.num_agents = num_agents
-        self.policy = policy
         self.nsteps = nsteps
+        self.env = env
+        self.policy = policy
         self.gamma = gamma
         self.epochs = epochs
         self.nbatchs = nbatchs
@@ -46,7 +44,7 @@ class Agent():
         self.weight_decay = weight_decay
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        #self.state = self.env.reset()
+        self.state = self.env.reset()
         self.opt = optim.Adam(policy.parameters(), lr=lrate, weight_decay=self.weight_decay)
 
         # lrate scheduler
@@ -64,8 +62,16 @@ class Agent():
         assert((self.nsteps * self.num_agents) % self.nbatchs == 0)
 
     @property
+    def num_agents(self):
+        return self.env.num_agents
+
+    @property
     def running_lrate(self):
         return self.opt.param_groups[0]['lr']
+
+    @property
+    def action_size(self):
+        return self.env.action_size
 
     def save(self, path):
         directory = os.path.dirname(path)
@@ -86,20 +92,34 @@ class Agent():
                 states[rge], actions[rge], old_log_probs[rge], returns[rge], advs[rge].squeeze(1)
                 )
 
-    def act(self, state):
-        
-        action, log_p, _, value = self.policy(self.tensor_from_np(state))
-        log_p = log_p.detach().cpu().numpy()
-        value = value.detach().squeeze(1).cpu().numpy()
-        action = action.detach().cpu().numpy()
-
-        return action, log_p, value
-
-    def step(self, state, trajectory_raw):
+    def step(self):
         # step lrate scheduler
         self.scheduler.step()
 
-        next_value = self.policy(self.tensor_from_np(state))[-1].detach().squeeze(1)
+        trajectory_raw = []
+        for _ in range(self.nsteps):
+
+            state = self.tensor_from_np(self.state)
+            action, log_p, _, value = self.policy(state)
+
+            log_p = log_p.detach().cpu().numpy()
+            value = value.detach().squeeze(1).cpu().numpy()
+            action = action.detach().cpu().numpy()
+
+
+            next_state, reward, done = self.env.step(action)
+            self.rewards += reward
+
+            # check if some episodes are done
+            for i, d in enumerate(done):
+                if d:
+                    self.episodes_reward.append(self.rewards[i])
+                    self.rewards[i] = 0
+
+            trajectory_raw.append((state, action, reward, log_p, value, 1-done))
+            self.state = next_state
+
+        next_value = self.policy(self.tensor_from_np(self.state))[-1].detach().squeeze(1)
         trajectory_raw.append((state, None, None, None, next_value.cpu().numpy(), None))
         trajectory = [None] * (len(trajectory_raw)-1)
         # process raw trajectories
@@ -110,7 +130,6 @@ class Agent():
         for i in reversed(range(len(trajectory_raw)-1)):
 
             states, actions, rewards, log_probs, values, dones = trajectory_raw[i]
-            states = self.tensor_from_np(states)
             actions, rewards, dones, values, next_values, log_probs = map(
                 lambda x: torch.tensor(x).float().to(self.device),
                 (actions, rewards, dones, values, trajectory_raw[i+1][-2], log_probs)
@@ -122,7 +141,7 @@ class Agent():
             advs = advs * self.gae_tau * self.gamma * dones[:, None] + td_errors[:, None]
             # with gae
             trajectory[i] = (states, actions, log_probs, R, advs)
-        
+
         states, actions, old_log_probs, returns, advs = map(
             lambda x: torch.cat(x, dim=0), zip(*trajectory)
             )
@@ -156,4 +175,4 @@ class Agent():
                 self.opt.step()
 
         # steps of the environement processed by the agent 
-        #self.steps += self.nsteps * self.num_agents
+        self.steps += self.nsteps * self.num_agents
