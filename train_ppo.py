@@ -1,3 +1,4 @@
+from utilities import Plotting
 import pickle
 import numpy as np
 
@@ -18,6 +19,16 @@ def train(agent,
           pb.Bar(), ' ', pb.ETA() ]
     timer = pb.ProgressBar(widgets=widget, maxval=iterations).start()
 
+    # Score Trend Initialization
+    plot = Plotting(
+        title ='Learning Process',
+        y_label = 'Score',
+        x_label = 'Episode #',
+        x_range = 250,
+    )
+    Pscore = []
+    plot.show()
+
     for it in range(iterations):
         frac = 1.0 - it / (iterations-1)
         agent.step()
@@ -25,8 +36,13 @@ def train(agent,
         if len(agent.episodes_reward) >= 100:
             r = agent.episodes_reward[:-101:-1]
             rewards.append((agent.steps, min(r), max(r), np.mean(r), np.std(r)))
+            Pscore.append(np.mean(r))
+            plot.Update(list(range(it+1)),Pscore)
             if (it+1)%50 ==0 :
                 print("Iteration: {0:d}, score: {1:f}".format(it+1,np.mean(r)))
+        else:
+            Pscore.append(np.sum(agent.episodes_reward)/100)
+            plot.Update(list(range(it+1)),Pscore)
 
         if (it+1) % log_each == 0:
             summary = ''
@@ -46,8 +62,6 @@ def train(agent,
                     last_saved = mean
                     agent.save(out_file)
                     summary += " (saved)"
-
-        
             
         timer.update(it+1)
 

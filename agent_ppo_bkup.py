@@ -106,7 +106,6 @@ class Agent():
             value = value.detach().squeeze(1).cpu().numpy()
             action = action.detach().cpu().numpy()
 
-
             next_state, reward, done = self.env.step(action)
             self.rewards += reward
 
