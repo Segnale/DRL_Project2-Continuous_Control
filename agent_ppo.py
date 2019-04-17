@@ -24,7 +24,7 @@ class Agent():
         gradient_clip       Gradient norm clipping
         restore
     """
-    def __init__(self, state_size, action_size, num_agents, policy,
+    def __init__(self, state_size, action_size, num_agents, policy, device,
                  nsteps=2048, epochs=10, nbatchs=32,
                  ratio_clip=0.2, lrate=2e-4, lrate_schedule=lambda it: max(0.995 ** it, 0.01), beta=0.0,
                  gae_tau=0.95, gamma=0.99, weight_decay=0.0, gradient_clip=5, restore=None):
@@ -45,7 +45,7 @@ class Agent():
         self.lrate_schedule = lrate_schedule
         self.weight_decay = weight_decay
 
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = device
         #self.state = self.env.reset()
         self.opt = optim.Adam(policy.parameters(), lr=lrate, weight_decay=self.weight_decay)
 
@@ -93,7 +93,7 @@ class Agent():
         value = value.detach().squeeze(1).cpu().numpy()
         action = action.detach().cpu().numpy()
 
-        return action, log_p, value
+        return np.clip(action,-1,1) , log_p, value
 
     def step(self, state, trajectory_raw):
         # step lrate scheduler
@@ -108,9 +108,7 @@ class Agent():
         R = next_value
 
         for i in reversed(range(len(trajectory_raw)-1)):
-
             states, actions, rewards, log_probs, values, dones = trajectory_raw[i]
-            states = self.tensor_from_np(states)
             actions, rewards, dones, values, next_values, log_probs = map(
                 lambda x: torch.tensor(x).float().to(self.device),
                 (actions, rewards, dones, values, trajectory_raw[i+1][-2], log_probs)

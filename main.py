@@ -1,91 +1,163 @@
 from unityagents import UnityEnvironment
 import numpy as np
-import model
-import my_methods
-import torch
-from agent_ppo import Agent
-from unity_env import UnityEnv
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# env = UnityEnvironment(file_name='Reachers_Windows_x86_64/Reacher.exe')
 
-# brain_name = env.brain_names[0]
-# brain = env.brains[brain_name]
+env = UnityEnvironment(file_name='Reachers_Windows_x86_64/Reacher.exe')
+
+# get the default brain
+brain_name = env.brain_names[0]
+brain = env.brains[brain_name]
 
 # reset the environment
-# env_info = env.reset(train_mode=True)[brain_name]
+env_info = env.reset(train_mode=True)[brain_name]
 
-# number of agents 
-# num_agents = len(env_info.agents)
-# print('Number of agents:', num_agents)
+# number of agents
+num_agents = len(env_info.agents)
+print('Number of agents:', num_agents)
 
 # size of each action
-# action_size = brain.vector_action_space_size
-# print('Size of each action:', action_size)
+action_size = brain.vector_action_space_size
+print('Size of each action:', action_size)
 
-# examine the state space
-# states = env_info.vector_observations
-# state_size = states.shape[1]
-# print('There are {} agents. Each observes a state with length: {}'.format(states.shape[0], state_size))
-# print('The state for the first agent looks like:', states[0])
+# examine the state space 
+state = env_info.vector_observations
+state_size = state.shape[1]
+print('There are {} agents. Each observes a state with length: {}'.format(state.shape[0], state_size))
+print('The state for the first agent looks like:', state[0])
 
-env = UnityEnv(env_file='Reachers_Windows_x86_64/Reacher.exe', no_graphics=True)
+import torch
+from agent_ppo import Agent
+from model import Policy
 
-discount_rate = .99
-epsilon = 0.1
-beta = .01
-tmax = 320
-SGD_epoch = 4
-seed = 0
-# training loop max iterations
-episode = 1500
+# Agent Parameters and more
+episodes = 500
+gamma = 0.99
+timesteps = 100
+ratio_clip = 0.2
+batch_size = int(10*20)
+epochs = 10
+gradient_clip = 10.0
+lrate = 1e-4
+log_each = 10
+beta = 0.01
+gae_tau = 0.95
+decay_steps = None
+solved = 30.0
+out_file = 'saved/ppo.ckpt'
 
-print("\nRunning with: ", device, "\n")
+#Load
 
-# widget bar to display progress
-#!pip install progressbar
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+print('Running on:', device)
+
+policy = Policy(state_size, action_size).to(device)
+
+agent = Agent(
+    state_size,
+    action_size,
+    num_agents,
+    policy,
+    device,
+    nsteps = timesteps,
+    gamma = gamma,
+    epochs = epochs,
+    nbatchs = batch_size,
+    ratio_clip = ratio_clip,
+    lrate = lrate,
+    gradient_clip = gradient_clip,
+    beta = beta,
+    gae_tau = gae_tau
+)
+
+from utilities import Plotting
+import pdb
 import progressbar as pb
-widget = ['training loop: ', pb.Percentage(), ' ',
-          pb.Bar(), ' ', pb.ETA() ]
-timer = pb.ProgressBar(widgets=widget, maxval=episode).start()
+from collections import namedtuple, deque
 
-# keep track of progress
 rewards = []
+last_saved = 0
+scores = deque(maxlen=100)
+PScores = []
+mean = 0
 
-policy = model.Policy(env.state_size, env.action_size, seed).to(device)
-agent = Agent(env, policy)
-# we use the adam optimizer with learning rate 2e-4
-# optim.SGD is also possible
-# import torch.optim as optim
-# optimizer = optim.Adam(policy.parameters(), lr=2e-4)
+ # Environment initialization and initial state
+env_info = env.reset(train_mode=True)[brain_name]
+state = env_info.vector_observations
 
-for e in range(episode):
+# Score Trend Initialization
+plot = Plotting(
+    title ='Learning Process',
+    y_label = 'Score',
+    x_label = 'Episode #',
+    x_range = 250,
+)
+plot.show()
 
-    agent.step()
+# Progress Bar to monitor the training
+widget = ['training loop: ', pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA(), ' Score:']
+timer = pb.ProgressBar(widgets=widget, maxval=episodes).start()
+
+for episode in range(episodes):
     
+    score = np.zeros(num_agents)
+    trajectory_raw = []
+    
+    # Trajectory collection
+    for _ in range(timesteps):
+        
+        action, log_p, value = agent.act(state)
+        action = np.clip(action, -1, 1) 
+        
+        # Environment response
+        env_info = env.step(action)[brain_name]
+        next_state = env_info.vector_observations         # get next state (for each agent)
+        reward = np.array(env_info.rewards)               # get reward (for each agent)
+        done = np.array(env_info.local_done)              # see if episode finished
+        
+        score += reward
+        
+        # check if some episodes are done
+        for i, d in enumerate(done):
+            if d:
+                scores.append(score[i])                 # collect agent score
+                score[i] = 0                            # reset agent score
+        
+        trajectory_raw.append((agent.tensor_from_np(state), action, reward, log_p, value, 1-done))
+        state = next_state
+        
+    agent.step(state, trajectory_raw)
+    
+    mean = np.sum(scores)/100
+    timer.update(episode+1)
+    PScores.append(mean)
+    plot.Update(list(range(episode+1)),PScores)
+        
+    if episode >= 100:
+        if (episode+1)%50 == 0 :
+            print("Iteration: {0:d}, score: {1:f}".format(episode+1,np.mean(scores)))
 
-    if len(agent.episodes_reward) >= 100:
-        r = agent.episodes_reward[:-101:-1]
-        total_rewards = agent.episodes_reward[:-101:-1]
-        rewards.append((agent.steps, min(r), max(r), np.mean(r), np.std(r)))
-
-    # display some progress every 20 iterations
-    if (e+1)%20 ==0 :
-        print("Episode: {0:d}, score: {1:f}".format(e+1,np.mean(total_rewards)))
-
-    # update progress widget bar
-    timer.update(e+1)
+    if out_file and mean >= solved and mean > last_saved:
+        last_saved = mean
+        agent.save(out_file)
+        print("saved")
 
 timer.finish()
 
-import pandas as pd
-import matplotlib.pyplot as plt
-df = pd.DataFrame({'score': list(zip(*rewards))[3]})
-# plot the score moving avarages to reduce the noise\n",
-fig = plt.figure(figsize=[10,5])
-ax = fig.add_subplot(111)
-plt.title("Learning")
-plt.plot(np.arange(len(rewards)), df)
-plt.ylabel('Score')
-plt.xlabel('Episode #')
-plt.show()
+# Save Training Trend
+#  Plotting the entire set of training episodes
+end_plot = Plotting(
+    title ='Learning Process',
+    y_label = 'Score',
+    x_label = 'Episode #',
+    x_values = list(range(episode+1)),
+    y_values = PScores
+)
+# Create the results directory if missed
+dirn = os.path.dirname('results/')
+if not os.path.exists(dirn):
+    os.mkdir(dirn)
+
+# Save a picture of the Trend
+currentDT = datetime.datetime.now()
+end_plot.save('results/Training_'+ currentDT.strftime("%Y%m%d%H%M")+'.png')

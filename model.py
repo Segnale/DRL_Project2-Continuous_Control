@@ -9,11 +9,11 @@ class Policy(nn.Module):
         self.state_size = state_size
         self.action_dim = action_dim
 
-        self.fc1 = nn.Linear(state_size, 100)
-        self.fc2 = nn.Linear(100, 100)
+        self.fc1 = nn.Linear(state_size, 125)
+        self.fc2 = nn.Linear(125, 125)
 
-        self.fc_actor = nn.Linear(100, self.action_dim)
-        self.fc_critic = nn.Linear(100, 1)
+        self.fc_actor = nn.Linear(125, self.action_dim)
+        self.fc_critic = nn.Linear(125, 1)
 
         self.std = nn.Parameter(torch.zeros(1, action_dim))
 
