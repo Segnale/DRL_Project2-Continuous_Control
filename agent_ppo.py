@@ -1,8 +1,6 @@
 import os
-import pdb
-
 import numpy as np
-
+from collections import deque
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -24,13 +22,22 @@ class Agent():
         gradient_clip       Gradient norm clipping
         restore
     """
-    def __init__(self, state_size, action_size, num_agents, policy, device,
+    def __init__(self, env, policy, device,
                  nsteps=2048, epochs=10, nbatchs=32,
                  ratio_clip=0.2, lrate=2e-4, lrate_schedule=lambda it: max(0.995 ** it, 0.01), beta=0.0,
                  gae_tau=0.95, gamma=0.99, weight_decay=0.0, gradient_clip=5, restore=None):
-        self.state_size = state_size
-        self.action_size = action_size
-        self.num_agents = num_agents
+
+        # Setup Environment
+        self.env = env
+        self.brain_name = self.env.brain_names[0]
+        self.brain = self.env.brains[self.brain_name]
+        env_info = self.env.reset(train_mode=True)[self.brain_name]
+        self.state = env_info.vector_observations         # get next state (for each agent)
+        self.state_size = self.state.shape[1]
+        self.num_agents = len(env_info.agents)
+        self.action_size = self.brain.vector_action_space_size
+
+        # Setup Hyperparameters
         self.policy = policy
         self.nsteps = nsteps
         self.gamma = gamma
@@ -57,8 +64,8 @@ class Agent():
             checkpoint = torch.load(restore)
             self.policy.load_state_dict(checkpoint)
 
-        self.rewards = np.zeros(self.num_agents)
-        self.episodes_reward = []
+        self.score = np.zeros(self.num_agents)
+        self.scores = deque(maxlen=100)
         self.steps = 0
 
         assert((self.nsteps * self.num_agents) % self.nbatchs == 0)
@@ -95,12 +102,37 @@ class Agent():
 
         return np.clip(action,-1,1) , log_p, value
 
-    def step(self, state, trajectory_raw):
+    def step(self):
         # step lrate scheduler
         self.scheduler.step()
 
-        next_value = self.policy(self.tensor_from_np(state))[-1].detach().squeeze(1)
-        trajectory_raw.append((state, None, None, None, next_value.cpu().numpy(), None))
+        trajectory_raw = []
+
+        # Trajectory collection
+        for _ in range(self.nsteps):
+        
+            action, log_p, value = self.act(self.state)
+            action = np.clip(action, -1, 1) 
+        
+        # Environment response
+            env_info = self.env.step(action)[self.brain_name]
+            next_state = env_info.vector_observations         # get next state (for each agent)
+            reward = np.array(env_info.rewards)               # get reward (for each agent)
+            done = np.array(env_info.local_done)              # see if episode finished
+        
+            self.score += reward
+        
+            # check if some episodes are done
+            for i, d in enumerate(done):
+                if d:
+                    self.scores.append(self.score[i])                 # collect agent score
+                    self.score[i] = 0                            # reset agent score
+        
+            trajectory_raw.append((self.tensor_from_np(self.state), action, reward, log_p, value, 1-done))
+            self.state = next_state
+
+        next_value = self.policy(self.tensor_from_np(self.state))[-1].detach().squeeze(1)
+        trajectory_raw.append((self.state, None, None, None, next_value.cpu().numpy(), None))
         trajectory = [None] * (len(trajectory_raw)-1)
         # process raw trajectories
         # calculate advantages and returns
@@ -154,4 +186,4 @@ class Agent():
                 self.opt.step()
 
         # steps of the environement processed by the agent 
-        #self.steps += self.nsteps * self.num_agents
+        self.steps += self.nsteps * self.num_agents
