@@ -15,7 +15,10 @@ The Critic holds an hidden layer of 256 + action space and a second hidden layer
 The 20 agents are sharing the two networks during training.
 
 Here the summary of parameters used:
-
+  - Learning Rate: `LR` = 5e-4,
+  - Soft Update `TAU` = 1e-3,
+  - `GAMMA` = 0.99,
+  - Update frequency `epoch` = 10
 
 ## Results
 
