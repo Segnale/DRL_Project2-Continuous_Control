@@ -21,7 +21,8 @@ if __name__ == '__main__':
     solved = 30.0
     out_file = 'saved/ppo.ckpt'
 
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu')
     env = UnityEnv(env_file='Reachers_Windows_x86_64/Reacher.exe', no_graphics=False)
     policy = Policy(env.state_size, env.action_size).to(device)
 
