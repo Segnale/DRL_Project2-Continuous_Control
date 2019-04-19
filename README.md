@@ -25,7 +25,7 @@ The Agent need to move the two joints of the arm in a 3D domain. That means, 4 c
 The state space has 33 dimensions and contains the agent's velocity, along with ray-based perception of objects around agent's forward direction.
 
 The Reward function of the Agent can be resumed by:
-- + 0.039 when the arm touch the target in the simulation time step
+- +0.039 when the arm touch the target in the simulation time step
 - 0 in the case the arm do not touch the target.
 
 The task is episodic, and it is considered solved if, in average, the 20 agents, can get each an average score of +30 over 100 consecutive episodes.
