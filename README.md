@@ -20,9 +20,8 @@ Beside the Unity environment, Python 3.6 must be available with the Unity ML-Age
  
 ## Environment 
 
-The Agent need to move the two joints of the arm in a 3D domain. That means, 4 continuous actions, two for each joint:
-
-The state space has 33 dimensions and contains the agent's velocity, along with ray-based perception of objects around agent's forward direction.
+The Agent need to move the two joints of the arm in a 3D domain. That means, 4 continuous actions, corresponding to torque applicable to the two joints.
+The state space has 33 dimensions and contains the position, rotation, velocity, and angular velocities of the arm.
 
 The Reward function of the Agent can be resumed by:
 - +0.039 when the arm touch the target in the simulation time step
