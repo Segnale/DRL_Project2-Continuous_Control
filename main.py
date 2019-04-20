@@ -30,7 +30,7 @@ from agent_ppo import Agent
 from model import Policy
 
 # Agent Parameters and more
-episodes = 1500
+episodes = 500
 gamma = 0.99
 timesteps = 100
 ratio_clip = 0.2

@@ -20,12 +20,13 @@ if __name__ == '__main__':
     decay_steps = None
     solved = 30.0
     out_file = 'saved/ppo.ckpt'
+    core = [100,100]
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     env = UnityEnv(env_file='Reachers_Windows_x86_64/Reacher.exe', no_graphics=False)
-    policy = Policy(env.state_size, env.action_size).to(device)
+    policy = Policy(env.state_size, env.action_size, core).to(device)
 
-    print("\nRunning with: ", device, "\n")
+    print("\nRunning on: ", device, "\n")
 
     a = Agent(
         env,

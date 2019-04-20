@@ -3,7 +3,6 @@ import pickle
 import numpy as np
 
 # widget bar to display progress
-#!pip install progressbar
 import progressbar as pb
 
 def train(agent,
@@ -16,7 +15,7 @@ def train(agent,
     last_saved = 0
 
     widget = ['training loop: ', pb.Percentage(), ' ',
-          pb.Bar(), ' ', pb.ETA() ]
+          pb.Bar(), ' ', pb.ETA(), ' | ', pb.DynamicMessage('Score')]
     timer = pb.ProgressBar(widgets=widget, maxval=iterations).start()
 
     # Score Trend Initialization
@@ -38,34 +37,11 @@ def train(agent,
             rewards.append((agent.steps, min(r), max(r), np.mean(r), np.std(r)))
             Pscore.append(np.mean(r))
             plot.Update(list(range(it+1)),Pscore)
-            if (it+1)%50 ==0 :
-                print("Iteration: {0:d}, score: {1:f}".format(it+1,np.mean(r)))
         else:
             Pscore.append(np.sum(agent.episodes_reward)/100)
             plot.Update(list(range(it+1)),Pscore)
-
-        if (it+1) % log_each == 0:
-            summary = ''
-            #pylint: disable=line-too-long
-            if rewards:
-                mean = rewards[-1][3]
-                minimum = rewards[-1][1]
-                maximum = rewards[-1][2]
-                summary = f', Rewards: {mean:.2f}/{rewards[-1][4]:.2f}/{minimum:.2f}/{maximum:.2f} mean/std/min/max'
-
-                if writer is not None:
-                    writer.add_scalar('data/score_mean', mean, it+1)
-                    writer.add_scalar('data/score_min', minimum, it+1)
-                    writer.add_scalar('data/score_max', maximum, it+1)
-
-                if out_file and mean >= solved and mean > last_saved:
-                    last_saved = mean
-                    agent.save(out_file)
-                    summary += " (saved)"
             
-        timer.update(it+1)
-
-            #print(f"Iteration: {it+1:d}, Episodes: {len(agent.episodes_reward)}, Steps: {agent.steps:d}, lrate: {agent.running_lrate:.2E}, Clip: {agent.ratio_clip:.3f}{summary}")
+        timer.update(it+1, Score = Pscore[-1])
 
     timer.finish()
     

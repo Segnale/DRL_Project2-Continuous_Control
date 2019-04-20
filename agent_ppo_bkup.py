@@ -92,6 +92,24 @@ class Agent():
                 states[rge], actions[rge], old_log_probs[rge], returns[rge], advs[rge].squeeze(1)
                 )
 
+    def act(self):
+        state = self.tensor_from_np(self.state)
+        action, log_p, _, value = self.policy(state)
+        log_p = log_p.detach().cpu().numpy()
+        value = value.detach().squeeze(1).cpu().numpy()
+        action = action.detach().cpu().numpy()
+
+        next_state, reward, done = self.env.step(action)
+        self.rewards += reward
+
+        # check if some episodes are done
+        for i, d in enumerate(done):
+            if d:
+                self.episodes_reward.append(self.rewards[i])
+                self.rewards[i] = 0
+        
+        return state, action, reward, next_state, log_p, value, done
+
     def step(self):
         # step lrate scheduler
         self.scheduler.step()
@@ -99,21 +117,7 @@ class Agent():
         trajectory_raw = []
         for _ in range(self.nsteps):
 
-            state = self.tensor_from_np(self.state)
-            action, log_p, _, value = self.policy(state)
-
-            log_p = log_p.detach().cpu().numpy()
-            value = value.detach().squeeze(1).cpu().numpy()
-            action = action.detach().cpu().numpy()
-
-            next_state, reward, done = self.env.step(action)
-            self.rewards += reward
-
-            # check if some episodes are done
-            for i, d in enumerate(done):
-                if d:
-                    self.episodes_reward.append(self.rewards[i])
-                    self.rewards[i] = 0
+            state, action, reward, next_state, log_p, value, done = self.act()
 
             trajectory_raw.append((state, action, reward, log_p, value, 1-done))
             self.state = next_state
