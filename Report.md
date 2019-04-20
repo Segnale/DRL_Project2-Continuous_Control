@@ -29,7 +29,7 @@ Here the summary of parameters used:
 ## Results
 
 The trend below shows the score avarege on 100 episodes achieved by the agent across the 800 episodes.
-![Results](results/Training_201904201716.png)
+![Results](Results/Training_201904201716.png)
 
 The score of 30 is reached around episode 361 with a stable and alost linear improvement. After 400 episodes the results reach the maximum and constantly around 35 points. The result is limited by the duration of the episode and the exploration feature of the agent.
 The performance of the agent after training overtakes the 36 points.
