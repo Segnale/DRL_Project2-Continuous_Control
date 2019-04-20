@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pdb
 from collections import deque
 import torch
 import torch.optim as optim
@@ -9,8 +10,8 @@ import torch.nn.functional as F
 class Agent():
     """PPO Agent
     Args
-        env:                Unity Environment
-        policy:             Deep Neural Network Model
+        env:                Environment wrapper
+        policy:             Network to optimise
         nsteps:             Number of steps per iteration is nsteps * num_agents
         epochs:             Number of training epoch per iteration
         nbatchs:            Number of batch per training epoch
@@ -20,7 +21,7 @@ class Agent():
         gae_tau:            GAE tau. Advantage estimation discounting factor
         gamma:              Discount rate 
         gradient_clip       Gradient norm clipping
-        restore:            File for weight restoring
+        restore
     """
     def __init__(self, env, policy, device,
                  nsteps=2048, epochs=10, nbatchs=32,
@@ -56,9 +57,12 @@ class Agent():
         #self.state = self.env.reset()
         self.opt = optim.Adam(policy.parameters(), lr=lrate, weight_decay=self.weight_decay)
 
-        # restore trained model
+        # lrate scheduler
+        #self.scheduler = optim.lr_scheduler.LambdaLR(self.opt, lr_lambda=lrate_schedule)
+
+        # restore weights
         if restore is not None:
-            checkpoint = torch.load(restore)
+            checkpoint = torch.load(restore, map_location=self.device)
             self.policy.load_state_dict(checkpoint)
 
         self.score = np.zeros(self.num_agents)
@@ -66,10 +70,6 @@ class Agent():
         self.steps = 0
 
         assert((self.nsteps * self.num_agents) % self.nbatchs == 0)
-
-    @property
-    def running_lrate(self):
-        return self.opt.param_groups[0]['lr']
 
     def save(self, path):
         directory = os.path.dirname(path)
@@ -90,50 +90,71 @@ class Agent():
                 states[rge], actions[rge], old_log_probs[rge], returns[rge], advs[rge].squeeze(1)
                 )
 
-    def act(self):
+    def act(self, state):
         
-        state = self.tensor_from_np(self.state)
-        action, log_p, _, value = self.policy(state)
-
+        action, log_p, _, value = self.policy(self.tensor_from_np(state))
         log_p = log_p.detach().cpu().numpy()
         value = value.detach().squeeze(1).cpu().numpy()
         action = action.detach().cpu().numpy()
 
-        # Environment response
-        env_info = self.env.step(np.clip(action,-1,1))[self.brain_name]
-        next_state = env_info.vector_observations         # get next state (for each agent)
-        reward = np.array(env_info.rewards)               # get reward (for each agent)
-        done = np.array(env_info.local_done)              # see if episode finished
-        
-        self.score += reward
-        
-        # check if some episodes are done
-        for i, d in enumerate(done):
-            if d:
-                self.scores.append(self.score[i])                 # collect agent score
-                self.score[i] = 0                            # reset agent score
-        
-        return state, action, reward, next_state, log_p, value, done
+        return np.clip(action,-1,1) , log_p, value
 
     def run(self):
 
+        run_done = False
         while True:
-            # Run a step
-            _, _, _, next_state, _, _, done = self.act()
 
-            # If any episode is completed breakout
-            if done.any:
+            action, _, _ = self.act(self.state)
+
+            # Environment response
+            action = np.clip(action, -1, 1) 
+            env_info = self.env.step(action)[self.brain_name]
+            next_state = env_info.vector_observations         # get next state (for each agent)
+            reward = np.array(env_info.rewards)               # get reward (for each agent)
+            done = np.array(env_info.local_done)              # see if episode finished
+
+            self.score += reward
+
+        # check if some episodes are done
+            for i, d in enumerate(done):
+                if d:
+                    self.scores.append(self.score[i])          # collect agent score
+                    run_done = True
+            if run_done:
                 break
-
+            
             self.state = next_state
 
     def step(self):
+        # step lrate scheduler
+        #self.scheduler.step()
+
+        trajectory_raw = []
 
         # Trajectory collection
-        trajectory_raw = []
         for _ in range(self.nsteps):
         
-            state, action, reward, next_state, log_p, value, done = self.act()
+            # action, log_p, value = self.act(self.state)
+            state = self.tensor_from_np(self.state)
+            action, log_p, _, value = self.policy(state)
+
+            log_p = log_p.detach().cpu().numpy()
+            value = value.detach().squeeze(1).cpu().numpy()
+            action = action.detach().cpu().numpy()
+        
+        # Environment response
+            env_info = self.env.step(action)[self.brain_name]
+            next_state = env_info.vector_observations         # get next state (for each agent)
+            reward = np.array(env_info.rewards)               # get reward (for each agent)
+            done = np.array(env_info.local_done)              # see if episode finished
+        
+            self.score += reward
+        
+            # check if some episodes are done
+            for i, d in enumerate(done):
+                if d:
+                    self.scores.append(self.score[i])                 # collect agent score
+                    self.score[i] = 0                            # reset agent score
         
             trajectory_raw.append((self.tensor_from_np(self.state), action, reward, log_p, value, 1-done))
             self.state = next_state

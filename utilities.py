@@ -52,3 +52,6 @@ class Plotting():
 
     def save(self, direction):
         self.plt.savefig(direction)
+
+    def legend(self, text,x,y):
+        self.plt.text(x, y, text, ha='left')
