@@ -8,13 +8,14 @@ The core of the algorithm is hold in the `agent_ppo.py` file. The `step` functio
 * use the trajectory to calculate the Estimated Return using the General Advantage Estimation. Here the article with more details about the [GAE](https://arxiv.org/abs/1506.02438).
 * use the updated policy to calculate the surrogate function and clip it to keep proximity.
 * Calculate the loss for the actor (surrogate clipped function), the critic (using GEA). 
-Actor and Critic Networks are optimized with the Adam optimizer at the end of each cicle.
-More details of the PPO can be found [here](https://arxiv.org/abs/1509.02971).
+Actor and Critic Networks are optimized with the Adam optimizer at the end of each cycle.
+
+More details of the PPO can be found [here](https://arxiv.org/abs/1707.06347).
 
 ## Model and Parameters
 The models of the Critic and Actor are DNN of fully connected layers.
 The Actor and Critic holds both two common hidden layers of 125 nodes each. 
-The 20 agents are shares the two networks. That improve training as they share the trajectories and experiance accumulated.
+The 20 agents are sharing the two networks. That improve training as they share the trajectories and experience accumulated.
 
 Here the summary of parameters used:
   - Learning Rate: `LR` = 1e-4,
@@ -27,21 +28,21 @@ Here the summary of parameters used:
 
 ## Results
 
-The trend below shows the score avarege on 100 episode achieved by the agent across the 550 episodes.
-![Results](results/Training_201904091107.png)
+The trend below shows the score avarege on 100 episodes achieved by the agent across the 800 episodes.
+![Results](results/Training_201904201716.png)
 
-The score of 30 is reached around episode 361 with a stable and alost linear improvement. After 400 episodes the results reach the maximum and constatly around 35 points. The result is limited by the duration of the episode and the exploration feature of the agent.
-In fact the performance of the agent after training reach the  points.
+The score of 30 is reached around episode 361 with a stable and alost linear improvement. After 400 episodes the results reach the maximum and constantly around 35 points. The result is limited by the duration of the episode and the exploration feature of the agent.
+The performance of the agent after training overtakes the 36 points.
 
 
 ## ToDo list
 Few ideas to work out with this project.
 
 ### Deeper Analysis of the Results 
-The Learning trend shows a constant improvement of the agent score paused by few 'plateau'. Breaking the training process around those areas and observing the brehaviour of the agent would help understand what changes in the strategy used by the agent to improve the learning further.
+The Learning trend shows a constant improvement of the agent score paused by few 'plateau'. Breaking the training process around those areas and observing the behavior of the agent would help understand what changes in the strategy used by the agent to improve the learning further.
 
 ### Generalize the Code
 I would like to apply the agent to solve wider set of problems. Beside the actual implementation a modular and more generalized implementation of the PPO and GAE algorithm can be tested, and further used for other applications.
 
-### Evolutionary Approach to select Paramenters and Architecture
-I am becoming a lazy man so, I would use an EA to find the best set of parameters and hyperparameters. The multiple agents environment provided may be leveraged to apply this strategy.
+### Evolutionary Approach to select Parameters and Architecture
+I am becoming a lazy man so; I would use an EA to find the best set of parameters and hyperparameters. The multiple agents environment provided may be leveraged to apply this strategy.
