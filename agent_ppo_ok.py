@@ -92,7 +92,7 @@ class Agent():
 
     def act(self, state):
         
-        action, log_p, _, value = self.policy(self.tensor_from_np(state))
+        action, log_p, _, value = self.policy(state)
         log_p = log_p.detach().cpu().numpy()
         value = value.detach().squeeze(1).cpu().numpy()
         action = action.detach().cpu().numpy()

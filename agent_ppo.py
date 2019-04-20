@@ -14,7 +14,7 @@ class Agent():
         nsteps:             Number of steps per iteration is nsteps * num_agents
         epochs:             Number of training epoch per iteration
         nbatchs:            Number of batch per training epoch
-        ratio_clip:         Probability ratio clipping
+        epsilon_clip:       Clipping factor
         lrate:              Learning rate 
         beta:               Policy entropy coefficient
         gae_tau:            GAE tau. Advantage estimation discounting factor
@@ -23,8 +23,8 @@ class Agent():
         restore:            File for weight restoring
     """
     def __init__(self, env, policy, device,
-                 nsteps=2048, epochs=10, nbatchs=32,
-                 ratio_clip=0.2, lrate=2e-4, lrate_schedule=lambda it: max(0.995 ** it, 0.01), beta=0.0,
+                 nsteps=1000, epochs=10, nbatchs=200,
+                 epsilon_clip=0.2, lrate=1e-4, lrate_schedule=lambda it: max(0.995 ** it, 0.01), beta=0.0,
                  gae_tau=0.95, gamma=0.99, weight_decay=0.0, gradient_clip=5, restore=None, train = True):
 
         # Setup Environment
@@ -43,7 +43,7 @@ class Agent():
         self.gamma = gamma
         self.epochs = epochs
         self.nbatchs = nbatchs
-        self.ratio_clip = ratio_clip
+        self.epsilon_clip = epsilon_clip
         self.lrate = lrate
         self.gradient_clip = gradient_clip
         self.beta = beta
@@ -58,7 +58,7 @@ class Agent():
 
         # restore trained model
         if restore is not None:
-            checkpoint = torch.load(restore)
+            checkpoint = torch.load(restore, map_location=self.device)
             self.policy.load_state_dict(checkpoint)
 
         self.score = np.zeros(self.num_agents)
@@ -66,10 +66,6 @@ class Agent():
         self.steps = 0
 
         assert((self.nsteps * self.num_agents) % self.nbatchs == 0)
-
-    @property
-    def running_lrate(self):
-        return self.opt.param_groups[0]['lr']
 
     def save(self, path):
         directory = os.path.dirname(path)
@@ -113,16 +109,15 @@ class Agent():
                 self.scores.append(self.score[i])                 # collect agent score
                 self.score[i] = 0                            # reset agent score
         
-        return state, action, reward, next_state, log_p, value, done
+        return action, reward, next_state, log_p, value, done
 
     def run(self):
-
+        
         while True:
-            # Run a step
-            _, _, _, next_state, _, _, done = self.act()
+            _, _, next_state, _, _, done = self.act()
 
             # If any episode is completed breakout
-            if done.any:
+            if done.any():
                 break
 
             self.state = next_state
@@ -133,7 +128,7 @@ class Agent():
         trajectory_raw = []
         for _ in range(self.nsteps):
         
-            state, action, reward, next_state, log_p, value, done = self.act()
+            action, reward, next_state, log_p, value, done = self.act()
         
             trajectory_raw.append((self.tensor_from_np(self.state), action, reward, log_p, value, 1-done))
             self.state = next_state
@@ -180,11 +175,10 @@ class Agent():
                 ratio = (new_log_probs_b - old_log_probs_b).exp()
 
                 # Clipped function
-                clip = torch.clamp(ratio, 1-self.ratio_clip, 1+self.ratio_clip)
+                clip = torch.clamp(ratio, 1-self.epsilon_clip, 1+self.epsilon_clip)
                 clipped_surrogate = torch.min(ratio*advs_b.unsqueeze(1), clip*advs_b.unsqueeze(1))
 
                 actor_loss = -torch.mean(clipped_surrogate) - self.beta * entropy_b.mean()
-                #critic_loss = 0.5 * (returns_b - values_b).pow(2).mean() 
                 critic_loss = F.smooth_l1_loss(values_b, returns_b.unsqueeze(1))
 
                 self.opt.zero_grad()
